@@ -1,0 +1,4 @@
+
+export PROJECT_ID=$(gcloud info --format='value(config.project)')
+echo "export PROJECTID=$PROJECT_ID" >> ~/.bashrc
+. ~/.bashrc
