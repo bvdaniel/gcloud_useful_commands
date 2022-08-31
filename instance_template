@@ -14,7 +14,11 @@ gcloud compute instance-groups managed create fancy-be-mig \
     --size 2 \
     --template fancy-be
     
-// Set ports for the services For your application, the frontend microservice runs on port 8080, and the backend microservice runs on port 8081 for orders and port 8082 for products:
+// Set ports for the services For your application, the frontend microservice runs on port 8080, and the backend microservice runs on port 8081 for orders and port 8082 for products
+// Since these are non-standard ports, you specify named ports to identify these.
+// Named ports are key:value pair metadata representing the service name and the port that it's running on. 
+// Named ports can be assigned to an instance group, which indicates that the service is available on all instances in the group.
+// This information is used by the HTTP Load Balancing service that will be configured later.
 
 gcloud compute instance-groups set-named-ports fancy-fe-mig \
     --named-ports frontend:8080
@@ -23,6 +27,14 @@ gcloud compute instance-groups set-named-ports fancy-be-mig \
     --named-ports orders:8081,products:8082
     
 // Health check for your instance group
+// Separate health checks for load balancing and for autohealing will be used.
+// Health checks for load balancing can and should be more aggressive because these health checks determine whether an instance receives user traffic.
+// You want to catch non-responsive instances quickly so you can redirect traffic if necessary.
+
+// In contrast, health checking for autohealing causes Compute Engine to proactively replace failing instances,
+// so this health check should be more conservative than a load balancing health check.
+// Create a health check that repairs the instance if it returns "unhealthy" 3 consecutive times for the frontend and backend:
+
 gcloud compute health-checks create http fancy-fe-hc \
     --port 8080 \
     --check-interval 30s \
@@ -48,4 +60,77 @@ gcloud compute http-health-checks create fancy-fe-frontend-hc \
 gcloud compute instance-groups managed update fancy-fe-mig \
     --health-check fancy-fe-hc \
     --initial-delay 300
+    
+// Create health checks that will be used to determine which instances are capable of serving traffic for each service:
+// Note: These health checks are for the load balancer, and only handle directing traffic from the load balancer;
+// they do not cause the managed instance groups to recreate instances.
+
+gcloud compute http-health-checks create fancy-fe-frontend-hc \
+  --request-path / \
+  --port 8080
+  
+// Create backend services that are the target for load-balanced traffic. 
+// The backend services will use the health checks and named ports you created:
+
+gcloud compute backend-services create fancy-fe-frontend \
+  --http-health-checks fancy-fe-frontend-hc \
+  --port-name frontend \
+  --global
+  
+// Add the Load Balancer's backend services:
+
+gcloud compute backend-services add-backend fancy-fe-frontend \
+  --instance-group fancy-fe-mig \
+  --instance-group-zone us-central1-f \
+  --global
+  
+// Create a URL map. The URL map defines which URLs are directed to which backend services:
+
+gcloud compute url-maps create fancy-map \
+  --default-service fancy-fe-frontend}
+ 
+// Create a path matcher to allow the /api/orders and /api/products paths to route to their respective services:
+
+gcloud compute url-maps add-path-matcher fancy-map \
+   --default-service fancy-fe-frontend \
+   --path-matcher-name orders \
+   --path-rules "/api/orders=fancy-be-orders,/api/products=fancy-be-products"
+
+// Create the proxy which ties to the URL map:
+
+gcloud compute target-http-proxies create fancy-proxy \
+  --url-map fancy-map
+
+// Create a global forwarding rule that ties a public IP address and port to the proxy:
+
+gcloud compute forwarding-rules create fancy-http-rule \
+  --global \
+  --target-http-proxy fancy-proxy \
+  --ports 80
+  
+// Since your instances pull the code at startup, you can issue a rolling restart command:
+// Note: In this example of a rolling replace, you specifically state that all machines can be replaced immediately through the --max-unavailable parameter.
+// Without this parameter, the command would keep an instance alive while restarting others to ensure availability. 
+// For testing purposes, you specify to replace all immediately for speed.
+
+gcloud compute instance-groups managed rolling-action replace fancy-fe-mig \
+    --max-unavailable 100%
+    
+ // To create the autoscaling policy, execute the following:
+
+gcloud compute instance-groups managed set-autoscaling \
+  fancy-fe-mig \
+  --max-num-replicas 2 \
+  --target-load-balancing-utilization 0.60
+  
+// Another feature that can help with scaling is to enable a Content Delivery Network service, to provide caching for the frontend.
+// Execute the following command on the frontend service:
+
+gcloud compute backend-services update fancy-fe-frontend \
+    --enable-cdn --global
+    
+// When a user requests content from the HTTP(S) load balancer, the request arrives at a Google Front End (GFE) which first looks in the Cloud CDN cache for a response to the user's request. 
+// If the GFE finds a cached response, the GFE sends the cached response to the user. This is called a cache hit.
+// If the GFE can't find a cached response for the request, the GFE makes a request directly to the backend. 
+// If the response to this request is cacheable, the GFE stores the response in the Cloud CDN cache so that the cache can be used for subsequent requests
     
