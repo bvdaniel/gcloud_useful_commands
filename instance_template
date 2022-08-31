@@ -1,0 +1,51 @@
+// Create template from instance
+gcloud compute instance-templates create fancy-fe \
+    --source-instance=frontend
+    
+// Next, create two managed instance groups, one for the frontend and one for the backend:
+
+gcloud compute instance-groups managed create fancy-fe-mig \
+    --base-instance-name fancy-fe \
+    --size 2 \
+    --template fancy-fe
+
+gcloud compute instance-groups managed create fancy-be-mig \
+    --base-instance-name fancy-be \
+    --size 2 \
+    --template fancy-be
+    
+// Set ports for the services For your application, the frontend microservice runs on port 8080, and the backend microservice runs on port 8081 for orders and port 8082 for products:
+
+gcloud compute instance-groups set-named-ports fancy-fe-mig \
+    --named-ports frontend:8080
+    
+gcloud compute instance-groups set-named-ports fancy-be-mig \
+    --named-ports orders:8081,products:8082
+    
+// Health check for your instance group
+gcloud compute health-checks create http fancy-fe-hc \
+    --port 8080 \
+    --check-interval 30s \
+    --healthy-threshold 1 \
+    --timeout 10s \
+    --unhealthy-threshold 3
+    
+// Create a firewall rule to allow the health check probes to connect to the microservices on ports 8080-8081:
+
+gcloud compute firewall-rules create allow-health-check \
+    --allow tcp:8080-8081 \
+    --source-ranges 130.211.0.0/22,35.191.0.0/16 \
+    --network default
+        
+// Create health checks that will be used to determine which instances are capable of serving traffic for each service:
+
+gcloud compute http-health-checks create fancy-fe-frontend-hc \
+  --request-path / \
+  --port 8080
+
+// Apply the health checks to their respective services:
+
+gcloud compute instance-groups managed update fancy-fe-mig \
+    --health-check fancy-fe-hc \
+    --initial-delay 300
+    
