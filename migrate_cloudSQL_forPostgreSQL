@@ -53,3 +53,156 @@ GRANT SELECT ON pglogical.replication_set_seq TO migration_admin;
 GRANT SELECT ON pglogical.replication_set_table TO migration_admin;
 GRANT SELECT ON pglogical.sequence_state TO migration_admin;
 GRANT SELECT ON pglogical.subscription TO migration_admin;
+
+// grant permissions to pglogical
+\c orders;
+GRANT USAGE ON SCHEMA pglogical TO migration_admin;
+GRANT ALL ON SCHEMA pglogical TO migration_admin;
+GRANT SELECT ON pglogical.tables TO migration_admin;
+GRANT SELECT ON pglogical.depend TO migration_admin;
+GRANT SELECT ON pglogical.local_node TO migration_admin;
+GRANT SELECT ON pglogical.local_sync_status TO migration_admin;
+GRANT SELECT ON pglogical.node TO migration_admin;
+GRANT SELECT ON pglogical.node_interface TO migration_admin;
+GRANT SELECT ON pglogical.queue TO migration_admin;
+GRANT SELECT ON pglogical.replication_set TO migration_admin;
+GRANT SELECT ON pglogical.replication_set_seq TO migration_admin;
+GRANT SELECT ON pglogical.replication_set_table TO migration_admin;
+GRANT SELECT ON pglogical.sequence_state TO migration_admin;
+GRANT SELECT ON pglogical.subscription TO migration_admin;
+
+// grant permissions to the public schema and tables for orders db
+GRANT USAGE ON SCHEMA public TO migration_admin;
+GRANT ALL ON SCHEMA public TO migration_admin;
+GRANT SELECT ON public.distribution_centers TO migration_admin;
+GRANT SELECT ON public.inventory_items TO migration_admin;
+GRANT SELECT ON public.order_items TO migration_admin;
+GRANT SELECT ON public.products TO migration_admin;
+GRANT SELECT ON public.users TO migration_admin;
+
+// In psql, grant permissions to the pglogical schema and tables for the gmemegen_db database.
+\c gmemegen_db;
+GRANT USAGE ON SCHEMA pglogical TO migration_admin;
+GRANT ALL ON SCHEMA pglogical TO migration_admin;
+GRANT SELECT ON pglogical.tables TO migration_admin;
+GRANT SELECT ON pglogical.depend TO migration_admin;
+GRANT SELECT ON pglogical.local_node TO migration_admin;
+GRANT SELECT ON pglogical.local_sync_status TO migration_admin;
+GRANT SELECT ON pglogical.node TO migration_admin;
+GRANT SELECT ON pglogical.node_interface TO migration_admin;
+GRANT SELECT ON pglogical.queue TO migration_admin;
+GRANT SELECT ON pglogical.replication_set TO migration_admin;
+GRANT SELECT ON pglogical.replication_set_seq TO migration_admin;
+GRANT SELECT ON pglogical.replication_set_table TO migration_admin;
+GRANT SELECT ON pglogical.sequence_state TO migration_admin;
+GRANT SELECT ON pglogical.subscription TO migration_admin;
+
+//In psql, grant permissions to the public schema and tables for the gmemegen_db database.
+GRANT USAGE ON SCHEMA public TO migration_admin;
+GRANT ALL ON SCHEMA public TO migration_admin;
+GRANT SELECT ON public.meme TO migration_admin;
+
+//We will also make the migration_admin user the owner of the tables in the orders database, so that we can edit the source data later, when we test the migration.
+
+\c orders;
+\dt
+ALTER TABLE public.distribution_centers OWNER TO migration_admin;
+ALTER TABLE public.inventory_items OWNER TO migration_admin;
+ALTER TABLE public.order_items OWNER TO migration_admin;
+ALTER TABLE public.products OWNER TO migration_admin;
+ALTER TABLE public.users OWNER TO migration_admin;
+\dt
+
+2. Create a Database Migration Service connection profile for a stand-alone PostgreSQL database
+// internal ip? : 10.142.0.2 
+
+//create connection profile for the postgresql source instance
+
+In the Google Cloud Console, on the Navigation menu (nav-menu.png), click Database Migration > Connection profiles.
+
+Click + Create Profile.
+
+For Source database engine, select PostgreSQL.
+
+For Connection profile name, enter postgres-vm.
+
+For Hostname or IP address, enter the internal IP for the PostgreSQL source instance that you copied in the previous task (e.g., 10.128.0.2)
+
+For Port, enter 5432.
+
+For Username, enter migration_admin.
+
+For Password, enter DMS_1s_cool! .
+
+For Region select us-east1 .
+
+For all other values leave the defaults.
+
+Click Create.
+
+3. Create and start a continuous migration job
+
+Create a new continuous migration job
+In this step you will create a new continuous migration job.
+
+In the Google Cloud Console, on the Navigation menu (nav-menu.png), click Database Migration > Migration jobs.
+
+Click + Create Migration Job.
+
+For Migration job name, enter vm-to-cloudsql.
+
+For Source database engine, select PostgreSQL.
+
+For Destination region, select us-east1 .
+
+For Migration job type, select Continuous.
+
+Leave the defaults for the other settings.
+
+Click Save & Continue.
+
+Define the source instance
+In this step, you will define the source instance for the migration.
+
+For Source connection profile, select postgres-vm.
+Leave the defaults for the other settings.
+
+Click Save & Continue.
+After you select the source connection profile, you can see its configuration details, including source hostname or IP address, port, username, and encryption type.
+
+Create the destination instance
+In this step, you will create the destination instance for the migration.
+
+For Destination Instance ID, enter postgresql-cloudsql.
+
+For Root password, enter supersecret!.
+
+For Database version, select Cloud SQL for PostgreSQL 13.
+
+In Choose region and zone section, select us-east1-b as zone.
+
+For Instance connectivity, select Private IP and Public IP.
+
+Select Use an automatically allocated IP range.
+
+Leave the defaults for the other settings.
+
+Click Allocate & Connect.
+Enter the additional information needed to create the destination instance on Cloud SQL.
+
+For Machine type. select Standard and check 1 vCPU, 3.75 GB
+
+For Storage type, select SSD
+
+For Storage capacity, select 10 GB
+
+Click Create & Continue.
+
+Define the connectivity method
+In this step, you will define the connectivity method for the migration.
+
+The message states that the button for configure & continue is enabled when the destination Cloud SQL instance has been created.
+
+For Connectivity method, select VPC peering.
+
+For VPC, select default.
