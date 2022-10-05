@@ -27,8 +27,10 @@ Antern has the following resources that need to be migrated, copied, or recreate
       >sudo apt install postgresql-13-pglogical
       Enable plogical. En pg_hba.conf agrega:
       host    all all 0.0.0.0/0   md5
+      >sudo nano /etc/postgresql/13/main/pg_hba.conf
       
-      Y en postgresql.conf:
+      Y en postgresql.conf(pueden ir todosal final):
+      >sudo nano /etc/postgresql/13/main/postgresql.conf
           #GSP918 - added configuration for pglogical database extension
           wal_level = logical         # minimal, replica, or logical
           max_worker_processes = 10   # one per database needed on provider node
@@ -42,81 +44,74 @@ Antern has the following resources that need to be migrated, copied, or recreate
     
       >sudo systemctl restart postgresql@13-main
       Launch psql
-      >sudo su - postgres psql
+      >sudo -u postgres psql
       Add the pglogical database extension to orders db
       psql>\c orders;
       psql>CREATE EXTENSION pglogical;
+      \c postgres;
+      CREATE EXTENSION pglogical;
+
       
 1.1.3 Create a dedicated user for database migration on the stand-alone database. (Replace migrtion_admin with other if needed)
-  name: xxx
+  name: replication_admin
   pass:DMS_1s_cool!
   In psql:
-  CREATE USER migration_admin PASSWORD 'DMS_1s_cool!';
-  ALTER DATABASE orders OWNER TO migration_admin;
-  ALTER ROLE migration_admin WITH REPLICATION;
+  CREATE USER replication_admin PASSWORD 'DMS_1s_cool!';
+  ALTER DATABASE orders OWNER TO replication_admin;
+  ALTER ROLE replication_admin WITH REPLICATION;
   
 1.1.4 Grant that user the required privileges and permissions for databases to be migrated. First check what tables exists
 and then update the following
     psql>
-    \c orders;
-    GRANT USAGE ON SCHEMA pglogical TO migration_admin;
-    GRANT ALL ON SCHEMA pglogical TO migration_admin;
-    GRANT SELECT ON pglogical.tables TO migration_admin;
-    GRANT SELECT ON pglogical.depend TO migration_admin;
-    GRANT SELECT ON pglogical.local_node TO migration_admin;
-    GRANT SELECT ON pglogical.local_sync_status TO migration_admin;
-    GRANT SELECT ON pglogical.node TO migration_admin;
-    GRANT SELECT ON pglogical.node_interface TO migration_admin;
-    GRANT SELECT ON pglogical.queue TO migration_admin;
-    GRANT SELECT ON pglogical.replication_set TO migration_admin;
-    GRANT SELECT ON pglogical.replication_set_seq TO migration_admin;
-    GRANT SELECT ON pglogical.replication_set_table TO migration_admin;
-    GRANT SELECT ON pglogical.sequence_state TO migration_admin;
-    GRANT SELECT ON pglogical.subscription TO migration_admin;
-    
-    GRANT USAGE ON SCHEMA public TO migration_admin;
-    GRANT ALL ON SCHEMA public TO migration_admin;
-    GRANT SELECT ON public.distribution_centers TO migration_admin;
-    GRANT SELECT ON public.inventory_items TO migration_admin;
-    GRANT SELECT ON public.order_items TO migration_admin;
-    GRANT SELECT ON public.products TO migration_admin;
-    GRANT SELECT ON public.users TO migration_admin;
+  \c orders;
+GRANT USAGE ON SCHEMA public TO replication_admin;
+    GRANT ALL ON SCHEMA public TO replication_admin;
+    GRANT SELECT ON public.distribution_centers TO replication_admin;
+    GRANT SELECT ON public.inventory_items TO replication_admin;
+    GRANT SELECT ON public.order_items TO replication_admin;
+    GRANT SELECT ON public.products TO replication_admin;
+    GRANT SELECT ON public.users TO replication_admin;
+
+    GRANT USAGE ON SCHEMA pglogical TO replication_admin;
+    GRANT ALL ON SCHEMA pglogical TO replication_admin;
+    GRANT SELECT ON pglogical.tables TO replication_admin;
+    GRANT SELECT ON pglogical.depend TO replication_admin;
+    GRANT SELECT ON pglogical.local_node TO replication_admin;
+    GRANT SELECT ON pglogical.local_sync_status TO replication_admin;
+    GRANT SELECT ON pglogical.node TO replication_admin;
+    GRANT SELECT ON pglogical.node_interface TO replication_admin;
+    GRANT SELECT ON pglogical.queue TO replication_admin;
+    GRANT SELECT ON pglogical.replication_set TO replication_admin;
+    GRANT SELECT ON pglogical.replication_set_seq TO replication_admin;
+    GRANT SELECT ON pglogical.replication_set_table TO replication_admin;
+    GRANT SELECT ON pglogical.sequence_state TO replication_admin;
+    GRANT SELECT ON pglogical.subscription TO replication_admin;
+
+    ALTER TABLE public.distribution_centers OWNER TO replication_admin;
+    ALTER TABLE public.inventory_items OWNER TO replication_admin;
+    ALTER TABLE public.order_items OWNER TO replication_admin;
+    ALTER TABLE public.products OWNER TO replication_admin;
+    ALTER TABLE public.users OWNER TO replication_admin;
+    ALTER TABLE public.inventory_items ADD PRIMARY KEY(id);
+
     
     \c postgres;
-    GRANT USAGE ON SCHEMA pglogical TO migration_admin;
-    GRANT ALL ON SCHEMA pglogical TO migration_admin;
-    GRANT SELECT ON pglogical.tables TO migration_admin;
-    GRANT SELECT ON pglogical.depend TO migration_admin;
-    GRANT SELECT ON pglogical.local_node TO migration_admin;
-    GRANT SELECT ON pglogical.local_sync_status TO migration_admin;
-    GRANT SELECT ON pglogical.node TO migration_admin;
-    GRANT SELECT ON pglogical.node_interface TO migration_admin;
-    GRANT SELECT ON pglogical.queue TO migration_admin;
-    GRANT SELECT ON pglogical.replication_set TO migration_admin;
-    GRANT SELECT ON pglogical.replication_set_seq TO migration_admin;
-    GRANT SELECT ON pglogical.replication_set_table TO migration_admin;
-    GRANT SELECT ON pglogical.sequence_state TO migration_admin;
-    GRANT SELECT ON pglogical.subscription TO migration_admin;
-    
-    Add a primary key to allow Database Migration Service to work
-    ALTER TABLE public.inventory_items ADD PRIMARY KEY(id);
-    \q 
-    exit
-    
-    Make the migration_admin user the owner of the tables in the orders database, 
-    so that you can edit the source data later, when you test the migration.
-    
-    psql>
-    \c orders;
-    \dt
-    ALTER TABLE public.distribution_centers OWNER TO migration_admin;
-    ALTER TABLE public.inventory_items OWNER TO migration_admin;
-    ALTER TABLE public.order_items OWNER TO migration_admin;
-    ALTER TABLE public.products OWNER TO migration_admin;
-    ALTER TABLE public.users OWNER TO migration_admin;
-    \dt
-    \q
-    exit
+    GRANT USAGE ON SCHEMA pglogical TO replication_admin;
+    GRANT ALL ON SCHEMA pglogical TO replication_admin;
+    GRANT SELECT ON pglogical.tables TO replication_admin;
+    GRANT SELECT ON pglogical.depend TO replication_admin;
+    GRANT SELECT ON pglogical.local_node TO replication_admin;
+    GRANT SELECT ON pglogical.local_sync_status TO replication_admin;
+    GRANT SELECT ON pglogical.node TO replication_admin;
+    GRANT SELECT ON pglogical.node_interface TO replication_admin;
+    GRANT SELECT ON pglogical.queue TO replication_admin;
+    GRANT SELECT ON pglogical.replication_set TO replication_admin;
+    GRANT SELECT ON pglogical.replication_set_seq TO replication_admin;
+    GRANT SELECT ON pglogical.replication_set_table TO replication_admin;
+    GRANT SELECT ON pglogical.sequence_state TO replication_admin;
+    GRANT SELECT ON pglogical.subscription TO replication_admin;
+
+
 
 1.2 Migrate the stand-alone PostgreSQL database to a Cloud SQL for PostgreSQL instance
 
@@ -124,7 +119,7 @@ and then update the following
 using the credentials of the Postgres Migration User migration user you created earlier.
 You must configure the connection profile using the internal ip-address of the source compute instance.
 
-  Username : xxx
+  Username : import_user
   Password : DMS_1s_cool!
   
   In the Google Cloud Console, on the Navigation menu, click Database Migration > Connection profiles.
@@ -133,7 +128,7 @@ You must configure the connection profile using the internal ip-address of the s
     For Database engine, select PostgreSQL.
     For Connection profile name, enter XXXXX.
     For Hostname or IP address, enter the internal IP for the PostgreSQL source instance that you copied in the previous task
-    (e.g., 10.128.0.2)
+    (e.g., 10.128.0.2): 10.128.0.2
     For Port, enter 5432.
     For Username, enter migration_admin.
     For Password, enter DMS_1s_cool! .
@@ -221,5 +216,5 @@ You must configure the connection profile using the internal ip-address of the s
       
 - Task 4: Troubleshoot and fix a broken GKE cluster. Note: For this task, you will need to log in to the Cymbal Project
   with the Cymbal Owner credentials.
-
+ update startup machine to update the cluster
       
